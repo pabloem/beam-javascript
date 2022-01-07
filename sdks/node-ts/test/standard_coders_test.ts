@@ -9,17 +9,19 @@ import util = require('util');
 
 const STANDARD_CODERS_FILE = '../../model/fn-execution/src/main/resources/org/apache/beam/model/fnexecution/v1/standard_coders.yaml';
 
+const UNSUPPORTED_EXAMPLES = {
+    'beam:coder:iterable:v1-beam:coder:bytes:v1': ''
+}
+
 // TODO(pabloem): Empty this list.
 const UNSUPPORTED_CODERS = [
     "beam:coder:interval_window:v1",
-    "beam:coder:double:v1",
     "beam:coder:timer:v1",
     "beam:coder:windowed_value:v1",
     "beam:coder:param_windowed_value:v1",
     "beam:coder:row:v1",
     "beam:coder:sharded_key:v1",
     "beam:coder:custom_window:v1",
-    //"beam:coder:iterable:v1",
 ];
 
 const _urn_to_json_value_parser = {
@@ -27,7 +29,7 @@ const _urn_to_json_value_parser = {
     'beam:coder:bool:v1': _ => x => x,
     'beam:coder:string_utf8:v1': _ => x => x as string,
     'beam:coder:varint:v1': _ => x => x,
-    'beam:coder:double:v1': _ => x => new Number(x),
+    'beam:coder:double:v1': _ => x => x === 'NaN' ? NaN : x,
     'beam:coder:kv:v1': components => x => ({ 'key': components[0](x['key']), 'value': components[1](x['value']) }),
     'beam:coder:iterable:v1': components => x => (x.map(elm => components[0](elm))),
     'beam:coder:global_window:v1': components => x => new GlobalWindow()
@@ -95,6 +97,13 @@ describe("standard Beam coders on Javascript", function() {
                     coder = new coderConstructor(...components);
                 } else {
                     coder = new coderConstructor();
+                }
+                var coderIds = spec.coder.urn;
+                if (spec.coder.components) {
+                    coderIds += '-' + spec.coder.components.map(c => c.urn).join('-')
+                }
+                if ((coderIds) in UNSUPPORTED_EXAMPLES) {
+                    return;
                 }
                 describeCoder(coder, urn, context, spec);
             });
